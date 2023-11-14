@@ -1,0 +1,65 @@
+repos:
+- repo: https://github.com/frostming/fix-future-annotations
+  rev: 0.5.0  # a released version tag
+  hooks:
+  - id: fix-future-annotations
+- repo: https://github.com/PyCQA/autoflake
+  rev: v2.2.1
+  hooks:
+  - id: autoflake
+    args: [--remove-all-unused-imports, --in-place]
+- repo: https://github.com/pycqa/isort
+  rev: 5.12.0
+  hooks:
+  - id: isort
+    language_version: python3.10
+- repo: https://github.com/psf/black
+  rev: 23.3.0
+  hooks:
+  - id: black
+    language_version: python3.10
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.10.1
+  hooks:
+  - id: pyupgrade
+    args: [--py310-plus]
+- repo: https://github.com/myint/docformatter
+  rev: v1.7.5
+  hooks:
+  - id: docformatter
+    args: [-i, --wrap-summaries, '92', --wrap-descriptions, '92']
+- repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+  rev: 0.2.3
+  hooks:
+  - id: yamlfmt
+    args: [--mapping, '2', --sequence, '2', --offset, '0', --width, '92', --implicit_start, --preserve-quotes]
+    # Hooks for validation
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: check-byte-order-marker
+  - id: check-case-conflict
+  - id: check-yaml
+    args: ["--unsafe"]
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+  - id: mixed-line-ending
+  - id: check-ast
+  - id: check-added-large-files
+    args: ['--maxkb=500']
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: debug-statements
+- repo: https://github.com/pycqa/flake8
+  rev: 6.1.0
+  hooks:
+  - id: flake8
+    args: [--ignore, "E226,E302,E41,W503,E203,N812", --max-line-length, "92"]
+    additional_dependencies:
+    - flake8-bugbear
+    - flake8-simplify
+    - flake8-logging
+    - pep8-naming
+    - flake8-newspaper-style
+    - flake8-annotations-coverage
+    - flake8-future-annotations
