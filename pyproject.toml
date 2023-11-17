@@ -1,8 +1,8 @@
 [project]
 name = "pytorch-tsmixer"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
-  { name="Konstantin Ditschuneit"},
+  { name="Konstantin Ditschuneit" }
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -11,9 +11,10 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-description = "An pytorch-based reimplementation of TSMixer"
+description = "An pytorch-based reimplementation of TSMixer."
 dependencies = ["torch>1.6"]
 optional-dependencies = { test=["hypothesis","pre-commit"] }
+urls = { Homepage= "https://github.com/ditschuk/pytorch-tsmixer" }
 
 [tool.setuptools]
 packages = ["torchtsmixer"]
@@ -50,3 +51,8 @@ skip = '''
     reports/*
     dist/*
 '''
+
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

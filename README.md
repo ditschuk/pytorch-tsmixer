@@ -4,9 +4,13 @@
 TSMixer is an **unofficial** PyTorch-based implementation of the TSMixer architecture as described [TSMixer Paper](https://arxiv.org/pdf/2303.06053.pdf). It leverages mixer layers for processing time series data, offering a robust approach for both standard and extended forecasting tasks.
 
 ## Installation
-To install the necessary dependencies, run:
+You can install the package using pip:
 ```bash
-pip install -e .
+pip install pytorch-tsmixer
+```
+or after cloning the repository, you can install it directly from the source code:
+```bash
+pip install .
 ```
 
 ## Modules
