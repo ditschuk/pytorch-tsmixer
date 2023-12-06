@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .layers import MixerLayer, feature_to_time, time_to_feature
+from .layers import MixerLayer, TimeBatchNorm1d, feature_to_time, time_to_feature
 
 
 class TSMixer(nn.Module):
@@ -27,6 +27,8 @@ class TSMixer(nn.Module):
         num_blocks: Number of mixer blocks. Defaults to 2.
         dropout_rate: Dropout rate for regularization. Defaults to 0.1.
         ff_dim: Dimension of feedforward network inside mixer layer. Defaults to 64.
+        normalize_before: Whether to apply layer normalization before or after mixer layer.
+        norm_type: Type of normalization to use. "batch" or "layer". Defaults to "batch".
     """
 
     def __init__(
@@ -39,11 +41,20 @@ class TSMixer(nn.Module):
         num_blocks: int = 2,
         dropout_rate: float = 0.1,
         ff_dim: int = 64,
+        normalize_before: bool = True,
+        norm_type: str = "batch",
     ):
         super().__init__()
 
         # Transform activation_fn to callable
         activation_fn = getattr(F, activation_fn)
+
+        # Transform norm_type to callable
+        assert norm_type in {
+            "batch",
+            "layer",
+        }, f"Invalid norm_type: {norm_type}, must be one of batch, layer."
+        norm_type = TimeBatchNorm1d if norm_type == "batch" else nn.LayerNorm
 
         # Build mixer layers
         self.mixer_layers = self._build_mixer(
@@ -54,6 +65,8 @@ class TSMixer(nn.Module):
             activation_fn=activation_fn,
             dropout_rate=dropout_rate,
             sequence_length=sequence_length,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
         # Temporal projection layer

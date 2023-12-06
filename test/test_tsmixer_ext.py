@@ -9,7 +9,7 @@ from torchtsmixer import TSMixerExt  # Replace with the actual import
 
 class TestTSMixerExt(unittest.TestCase):
     @given(
-        batch_size=st.integers(min_value=1, max_value=10),
+        batch_size=st.integers(min_value=2, max_value=10),
         sequence_length=st.integers(min_value=1, max_value=20),
         prediction_length=st.integers(min_value=1, max_value=20),
         input_channels=st.integers(min_value=1, max_value=5),
@@ -17,6 +17,8 @@ class TestTSMixerExt(unittest.TestCase):
         static_channels=st.integers(min_value=1, max_value=5),
         hidden_channels=st.integers(min_value=1, max_value=64),
         output_channels=st.integers(min_value=1, max_value=5),
+        normalize_before=st.booleans(),
+        norm_type=st.sampled_from(("batch", "layer")),
     )
     def test_output_shape(
         self,
@@ -28,6 +30,8 @@ class TestTSMixerExt(unittest.TestCase):
         static_channels: int,
         hidden_channels: int,
         output_channels: int,
+        normalize_before: bool,
+        norm_type: str,
     ) -> None:
         """Test the output shape of TSMixerExt model.
 
@@ -49,6 +53,8 @@ class TestTSMixerExt(unittest.TestCase):
             hidden_channels=hidden_channels,
             static_channels=static_channels,
             output_channels=output_channels,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
         x_hist = torch.randn(batch_size, sequence_length, input_channels)

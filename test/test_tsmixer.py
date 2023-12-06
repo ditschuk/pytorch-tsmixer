@@ -17,7 +17,9 @@ class TSMixerTest(unittest.TestCase):
         prediction_length=st.integers(min_value=5, max_value=50),
         input_channels=st.integers(min_value=1, max_value=10),
         num_blocks=st.integers(min_value=1, max_value=5),
-        batch_size=st.integers(min_value=1, max_value=10),
+        batch_size=st.integers(min_value=2, max_value=10),
+        normalize_before=st.booleans(),
+        norm_type=st.sampled_from(("batch", "layer")),
     )
     def test_tsmixer_shapes(
         self,
@@ -26,6 +28,8 @@ class TSMixerTest(unittest.TestCase):
         input_channels: int,
         num_blocks: int,
         batch_size: int,
+        normalize_before: bool,
+        norm_type: str,
     ) -> None:
         """Test the output shape of TSMixer model.
 
@@ -43,6 +47,8 @@ class TSMixerTest(unittest.TestCase):
             prediction_length=prediction_length,
             input_channels=input_channels,
             num_blocks=num_blocks,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
         x = torch.randn(batch_size, sequence_length, input_channels)

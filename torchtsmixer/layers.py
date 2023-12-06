@@ -125,6 +125,8 @@ class ConditionalFeatureMixing(nn.Module):
         ff_dim: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
+        normalize_before: bool = False,
+        norm_type: type[nn.Module] = nn.LayerNorm,
     ):
         super().__init__()
 
@@ -135,8 +137,8 @@ class ConditionalFeatureMixing(nn.Module):
             ff_dim,
             activation_fn,
             dropout_rate,
-            normalize_before=False,
-            norm_type=nn.LayerNorm,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
     def forward(
@@ -240,15 +242,27 @@ class MixerLayer(nn.Module):
         ff_dim: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
+        normalize_before: bool = False,
+        norm_type: type[nn.Module] = nn.LayerNorm,
     ):
         """Initializes the MixLayer with time and feature mixing modules."""
         super().__init__()
 
         self.time_mixing = TimeMixing(
-            input_channels, sequence_length, activation_fn, dropout_rate
+            input_channels,
+            sequence_length,
+            activation_fn,
+            dropout_rate,
+            norm_type=norm_type,
         )
         self.feature_mixing = FeatureMixing(
-            input_channels, output_channels, ff_dim, activation_fn, dropout_rate
+            input_channels,
+            output_channels,
+            ff_dim,
+            activation_fn,
+            dropout_rate,
+            norm_type=norm_type,
+            normalize_before=normalize_before,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -292,6 +306,8 @@ class ConditionalMixerLayer(nn.Module):
         ff_dim: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
+        normalize_before: bool = False,
+        norm_type: type[nn.Module] = nn.LayerNorm,
     ):
         super().__init__()
 
@@ -300,7 +316,7 @@ class ConditionalMixerLayer(nn.Module):
             sequence_length,
             activation_fn,
             dropout_rate,
-            norm_type=nn.LayerNorm,
+            norm_type=norm_type,
         )
         self.feature_mixing = ConditionalFeatureMixing(
             input_channels,
@@ -309,6 +325,8 @@ class ConditionalMixerLayer(nn.Module):
             ff_dim=ff_dim,
             activation_fn=activation_fn,
             dropout_rate=dropout_rate,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
     def forward(self, x: torch.Tensor, x_static: torch.Tensor) -> torch.Tensor:
