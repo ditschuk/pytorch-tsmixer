@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from .layers import (
     ConditionalFeatureMixing,
     ConditionalMixerLayer,
-    TimeBatchNorm1d,
+    TimeBatchNorm2d,
     feature_to_time,
     time_to_feature,
 )
@@ -68,13 +68,14 @@ class TSMixerExt(nn.Module):
             "batch",
             "layer",
         }, f"Invalid norm_type: {norm_type}, must be one of batch, layer."
-        norm_type = TimeBatchNorm1d if norm_type == "batch" else nn.LayerNorm
+        norm_type = TimeBatchNorm2d if norm_type == "batch" else nn.LayerNorm
 
         self.fc_hist = nn.Linear(sequence_length, prediction_length)
         self.fc_out = nn.Linear(hidden_channels, output_channels or input_channels)
 
         self.feature_mixing_hist = ConditionalFeatureMixing(
-            input_channels + extra_channels,
+            sequence_length=prediction_length,
+            input_channels=input_channels + extra_channels,
             output_channels=hidden_channels,
             static_channels=static_channels,
             ff_dim=ff_dim,
@@ -84,7 +85,8 @@ class TSMixerExt(nn.Module):
             norm_type=norm_type,
         )
         self.feature_mixing_future = ConditionalFeatureMixing(
-            extra_channels,
+            sequence_length=prediction_length,
+            input_channels=extra_channels,
             output_channels=hidden_channels,
             static_channels=static_channels,
             ff_dim=ff_dim,

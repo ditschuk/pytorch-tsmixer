@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .layers import MixerLayer, TimeBatchNorm1d, feature_to_time, time_to_feature
+from .layers import MixerLayer, TimeBatchNorm2d, feature_to_time, time_to_feature
 
 
 class TSMixer(nn.Module):
@@ -54,7 +54,7 @@ class TSMixer(nn.Module):
             "batch",
             "layer",
         }, f"Invalid norm_type: {norm_type}, must be one of batch, layer."
-        norm_type = TimeBatchNorm1d if norm_type == "batch" else nn.LayerNorm
+        norm_type = TimeBatchNorm2d if norm_type == "batch" else nn.LayerNorm
 
         # Build mixer layers
         self.mixer_layers = self._build_mixer(
