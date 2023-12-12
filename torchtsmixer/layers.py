@@ -7,29 +7,56 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 
 
-class TimeBatchNorm1d(nn.BatchNorm1d):
-    """A batch normalization applied to the time dimension of a sequence."""
+class TimeBatchNorm2d(nn.BatchNorm1d):
+    """A batch normalization layer that normalizes over the last two dimensions of a
+    sequence in PyTorch, mimicking Keras behavior.
 
-    def forward(self, x: Tensor) -> Tensor:
-        """
+    This class extends nn.BatchNorm1d to apply batch normalization across time and
+    feature dimensions.
+
+    Attributes:
+        num_time_steps (int): Number of time steps in the input.
+        num_channels (int): Number of channels in the input.
+    """
+
+    def __init__(self, normalized_shape: tuple[int, int]):
+        """Initializes the TimeBatchNorm2d module.
 
         Args:
-            x: A 3D tensor with shape (N, S, L) where S is the sequence dimension,
-               and L is the feature dimension length.
+            normalized_shape (tuple[int, int]): A tuple (num_time_steps, num_channels)
+                representing the shape of the time and feature dimensions to normalize.
+        """
+        num_time_steps, num_channels = normalized_shape
+        super().__init__(num_channels * num_time_steps)
+        self.num_time_steps = num_time_steps
+        self.num_channels = num_channels
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Applies the batch normalization over the last two dimensions of the input tensor.
+
+        Args:
+            x (Tensor): A 3D tensor with shape (N, S, C), where N is the batch size,
+                S is the number of time steps, and C is the number of channels.
 
         Returns:
-            A 3D tensor, where the batch normalization has been applied to the
-            channel dimension.
+            Tensor: A 3D tensor with batch normalization applied over the last two dims.
 
         Raises:
-            AssertionError: If the input tensor is not 3D.
+            ValueError: If the input tensor is not 3D.
         """
         if x.ndim != 3:
-            raise ValueError(f"Expected 3D x tensor, but got {x.ndim}D tensor instead.")
+            raise ValueError(f"Expected 3D input tensor, but got {x.ndim}D tensor instead.")
 
-        x = x.permute(0, 2, 1)
+        # Reshaping input to combine time and feature dimensions for normalization
+        x = x.reshape(x.shape[0], -1, 1)
+
+        # Applying batch normalization
         x = super().forward(x)
-        return x.permute(0, 2, 1)
+
+        # Reshaping back to original dimensions (N, S, C)
+        x = x.reshape(x.shape[0], self.num_time_steps, self.num_channels)
+
+        return x
 
 
 class FeatureMixing(nn.Module):
@@ -39,6 +66,7 @@ class FeatureMixing(nn.Module):
     uses dropout for regularization, and allows for different activation functions.
 
     Args:
+        sequence_length: The length of the sequences to be transformed.
         input_channels: The number of input channels to the module.
         output_channels: The number of output channels from the module.
         ff_dim: The dimension of the feed-forward network internal to the module.
@@ -50,20 +78,27 @@ class FeatureMixing(nn.Module):
 
     def __init__(
         self,
+        sequence_length: int,
         input_channels: int,
         output_channels: int,
         ff_dim: int,
         activation_fn: Callable[[torch.Tensor], torch.Tensor] = F.relu,
         dropout_rate: float = 0.1,
         normalize_before: bool = True,
-        norm_type: type[nn.Module] = TimeBatchNorm1d,
+        norm_type: type[nn.Module] = TimeBatchNorm2d,
     ):
         """Initializes the FeatureMixing module with the provided parameters."""
         super().__init__()
 
-        self.norm_before = norm_type(input_channels) if normalize_before else nn.Identity()
+        self.norm_before = (
+            norm_type((sequence_length, input_channels))
+            if normalize_before
+            else nn.Identity()
+        )
         self.norm_after = (
-            norm_type(output_channels) if not normalize_before else nn.Identity()
+            norm_type((sequence_length, output_channels))
+            if not normalize_before
+            else nn.Identity()
         )
 
         self.activation_fn = activation_fn
@@ -119,24 +154,28 @@ class ConditionalFeatureMixing(nn.Module):
 
     def __init__(
         self,
+        sequence_length: int,
         input_channels: int,
         output_channels: int,
         static_channels: int,
         ff_dim: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
+        normalize_before: bool = False,
+        norm_type: type[nn.Module] = nn.LayerNorm,
     ):
         super().__init__()
 
         self.fr_static = nn.Linear(static_channels, output_channels)
         self.fm = FeatureMixing(
+            sequence_length,
             input_channels + output_channels,
             output_channels,
             ff_dim,
             activation_fn,
             dropout_rate,
-            normalize_before=False,
-            norm_type=nn.LayerNorm,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
     def forward(
@@ -184,15 +223,15 @@ class TimeMixing(nn.Module):
 
     def __init__(
         self,
-        input_channels: int,
         sequence_length: int,
+        input_channels: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
-        norm_type: type[nn.Module] = TimeBatchNorm1d,
+        norm_type: type[nn.Module] = TimeBatchNorm2d,
     ):
         """Initializes the TimeMixing module with the specified parameters."""
         super().__init__()
-        self.norm = norm_type(input_channels)  # Assuming a dummy channel dimension
+        self.norm = norm_type((sequence_length, input_channels))
         self.activation_fn = activation_fn
         self.dropout = nn.Dropout(dropout_rate)
         self.fc1 = nn.Linear(sequence_length, sequence_length)
@@ -225,8 +264,9 @@ class MixerLayer(nn.Module):
     dependencies and feature interactions respectively.
 
     Args:
-        input_channels: The number of input channels to the module.
         sequence_length: The length of the input sequences.
+        input_channels: The number of input channels to the module.
+        output_channels: The number of output channels from the module.
         ff_dim: The inner dimension of the feedforward network used in feature mixing.
         activation_fn: The activation function used in both time and feature mixing.
         dropout_rate: The dropout probability used in both mixing operations.
@@ -234,21 +274,34 @@ class MixerLayer(nn.Module):
 
     def __init__(
         self,
+        sequence_length: int,
         input_channels: int,
         output_channels: int,
-        sequence_length: int,
         ff_dim: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
+        normalize_before: bool = False,
+        norm_type: type[nn.Module] = nn.LayerNorm,
     ):
         """Initializes the MixLayer with time and feature mixing modules."""
         super().__init__()
 
         self.time_mixing = TimeMixing(
-            input_channels, sequence_length, activation_fn, dropout_rate
+            sequence_length,
+            input_channels,
+            activation_fn,
+            dropout_rate,
+            norm_type=norm_type,
         )
         self.feature_mixing = FeatureMixing(
-            input_channels, output_channels, ff_dim, activation_fn, dropout_rate
+            sequence_length,
+            input_channels,
+            output_channels,
+            ff_dim,
+            activation_fn,
+            dropout_rate,
+            norm_type=norm_type,
+            normalize_before=normalize_before,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -274,10 +327,10 @@ class ConditionalMixerLayer(nn.Module):
     that are influenced by both dynamic and static features.
 
     Args:
+        sequence_length: The length of the input sequences.
         input_channels: The number of input channels of the dynamic features.
         output_channels: The number of output channels after feature mixing.
         static_channels: The number of channels in the static feature input.
-        sequence_length: The length of the input sequences.
         ff_dim: The inner dimension of the feedforward network used in feature mixing.
         activation_fn: The activation function used in both mixing operations.
         dropout_rate: The dropout probability used in both mixing operations.
@@ -285,30 +338,35 @@ class ConditionalMixerLayer(nn.Module):
 
     def __init__(
         self,
+        sequence_length: int,
         input_channels: int,
         output_channels: int,
         static_channels: int,
-        sequence_length: int,
         ff_dim: int,
         activation_fn: Callable = F.relu,
         dropout_rate: float = 0.1,
+        normalize_before: bool = False,
+        norm_type: type[nn.Module] = nn.LayerNorm,
     ):
         super().__init__()
 
         self.time_mixing = TimeMixing(
-            input_channels,
             sequence_length,
+            input_channels,
             activation_fn,
             dropout_rate,
-            norm_type=nn.LayerNorm,
+            norm_type=norm_type,
         )
         self.feature_mixing = ConditionalFeatureMixing(
+            sequence_length,
             input_channels,
             output_channels=output_channels,
             static_channels=static_channels,
             ff_dim=ff_dim,
             activation_fn=activation_fn,
             dropout_rate=dropout_rate,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
     def forward(self, x: torch.Tensor, x_static: torch.Tensor) -> torch.Tensor:

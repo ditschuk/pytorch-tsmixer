@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from .layers import (
     ConditionalFeatureMixing,
     ConditionalMixerLayer,
+    TimeBatchNorm2d,
     feature_to_time,
     time_to_feature,
 )
@@ -33,6 +34,8 @@ class TSMixerExt(nn.Module):
         ff_dim: The inner dimension of the feedforward network in the mixer layers.
         output_channels: The number of output channels for the final output. If None,
                          defaults to the number of input_channels.
+        normalize_before: Whether to apply layer normalization before or after mixer layer.
+        norm_type: The type of normalization to use. "batch" or "layer".
     """
 
     def __init__(
@@ -48,6 +51,8 @@ class TSMixerExt(nn.Module):
         static_channels: int = 1,
         ff_dim: int = 64,
         output_channels: int = None,
+        normalize_before: bool = False,
+        norm_type: str = "layer",
     ):
         assert static_channels > 0, "static_channels must be greater than 0"
         super().__init__()
@@ -58,24 +63,37 @@ class TSMixerExt(nn.Module):
         else:
             raise ValueError(f"Unknown activation function: {activation_fn}")
 
+        # Transform norm_type to callable
+        assert norm_type in {
+            "batch",
+            "layer",
+        }, f"Invalid norm_type: {norm_type}, must be one of batch, layer."
+        norm_type = TimeBatchNorm2d if norm_type == "batch" else nn.LayerNorm
+
         self.fc_hist = nn.Linear(sequence_length, prediction_length)
         self.fc_out = nn.Linear(hidden_channels, output_channels or input_channels)
 
         self.feature_mixing_hist = ConditionalFeatureMixing(
-            input_channels + extra_channels,
+            sequence_length=prediction_length,
+            input_channels=input_channels + extra_channels,
             output_channels=hidden_channels,
             static_channels=static_channels,
             ff_dim=ff_dim,
             activation_fn=activation_fn,
             dropout_rate=dropout_rate,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
         self.feature_mixing_future = ConditionalFeatureMixing(
-            extra_channels,
+            sequence_length=prediction_length,
+            input_channels=extra_channels,
             output_channels=hidden_channels,
             static_channels=static_channels,
             ff_dim=ff_dim,
             activation_fn=activation_fn,
             dropout_rate=dropout_rate,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
         self.conditional_mixer = self._build_mixer(
@@ -86,6 +104,8 @@ class TSMixerExt(nn.Module):
             static_channels=static_channels,
             activation_fn=activation_fn,
             dropout_rate=dropout_rate,
+            normalize_before=normalize_before,
+            norm_type=norm_type,
         )
 
     @staticmethod
